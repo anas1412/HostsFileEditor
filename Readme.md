@@ -22,8 +22,8 @@ A modern, user-friendly GUI application for managing Windows hosts file entries.
 1. Ensure you have Python 3.6 or higher installed on your system
 2. Clone this repository:
    ```bash
-   git clone https://github.com/yourusername/hostsEditor.git
-   cd hostsEditor
+   git clone https://github.com/anas1412/HostsFileEditor
+   cd HostsFileEditor
    ```
 3. Install the required dependencies:
    ```bash
