@@ -33,6 +33,9 @@ class HostsManager(tk.Tk):
         # Status bar
         self.status_var = tk.StringVar()
         
+        # Default IP for all entries
+        self.default_ip = "127.0.0.1"
+        
         self.load_hosts_file()
         self.create_widgets()
         
@@ -56,9 +59,22 @@ class HostsManager(tk.Tk):
                     if line and not line.startswith('#'):
                         parts = line.split()
                         if len(parts) > 1:
-                            ip = parts[0]
-                            domains = parts[1:]
-                            self.hosts_entries.append({'ip': ip, 'domains': domains, 'raw': line})
+                            # Check if this is a comment line with domains
+                            comment = ""
+                            domains = []
+                            
+                            if parts[0] == self.default_ip:
+                                # Extract domains and possible comment
+                                for part in parts[1:]:
+                                    if part.startswith('#'):
+                                        # Everything after # is a comment
+                                        comment_index = line.find('#')
+                                        if comment_index > -1:
+                                            comment = line[comment_index:].strip()
+                                        break
+                                    domains.append(part)
+                                
+                                self.hosts_entries.append({'domains': domains, 'comment': comment})
             self.show_status("Hosts file loaded successfully", 'success')
         except Exception as e:
             self.show_status(f"Error loading hosts file: {str(e)}", 'error')
@@ -72,7 +88,8 @@ class HostsManager(tk.Tk):
             # Create a set of active entries for easy lookup
             active_entries = set()
             for entry in self.hosts_entries:
-                active_entries.add(f"{entry['ip']} {' '.join(entry['domains'])}")
+                domains_str = ' '.join(entry['domains'])
+                active_entries.add(f"{self.default_ip} {domains_str}")
 
             # Process the file line by line
             new_lines = []
@@ -85,14 +102,26 @@ class HostsManager(tk.Tk):
                 
                 # Check if this line is an active entry
                 parts = line.strip().split()
-                if len(parts) > 1:
-                    entry = f"{parts[0]} {' '.join(parts[1:])}"
-                    if entry not in active_entries:
+                if len(parts) > 1 and parts[0] == self.default_ip:
+                    # Extract just the domains part for comparison
+                    domains_part = ' '.join(parts[1:])
+                    # Remove any comments from the domains part for comparison
+                    if '#' in domains_part:
+                        domains_part = domains_part[:domains_part.find('#')].strip()
+                    
+                    entry_to_check = f"{self.default_ip} {domains_part}"
+                    if entry_to_check not in active_entries:
                         continue
 
             # Add any new entries that weren't in the original file
             for entry in self.hosts_entries:
-                entry_str = f"{entry['ip']} {' '.join(entry['domains'])}"
+                domains_str = ' '.join(entry['domains'])
+                entry_str = f"{self.default_ip} {domains_str}"
+                
+                # Add comment if present
+                if entry.get('comment', ''):
+                    entry_str += f" {entry['comment']}"
+                    
                 if entry_str not in [line.strip() for line in new_lines if line.strip()]:
                     new_lines.append(entry_str)
 
@@ -126,11 +155,11 @@ class HostsManager(tk.Tk):
         tree_frame = ttk.Frame(main_container)
         tree_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
 
-        self.tree = ttk.Treeview(tree_frame, columns=('IP', 'Domains'), show='headings')
-        self.tree.heading('IP', text='IP Address')
+        self.tree = ttk.Treeview(tree_frame, columns=('Domains', 'Comment'), show='headings')
         self.tree.heading('Domains', text='Domains')
-        self.tree.column('IP', width=150)
-        self.tree.column('Domains', width=600)
+        self.tree.heading('Comment', text='Comment')
+        self.tree.column('Domains', width=500)
+        self.tree.column('Comment', width=250)
 
         # Scrollbars
         y_scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.tree.yview)
@@ -202,7 +231,8 @@ class HostsManager(tk.Tk):
         self.load_hosts_file()
         self.tree.delete(*self.tree.get_children())
         for entry in self.hosts_entries:
-            self.tree.insert('', 'end', values=(entry['ip'], ', '.join(entry['domains'])))
+            comment = entry.get('comment', '')
+            self.tree.insert('', 'end', values=(', '.join(entry['domains']), comment))
         self.show_status("List refreshed", 'info')
 
     def add_entry(self):
@@ -221,26 +251,30 @@ class HostsManager(tk.Tk):
         frame = ttk.Frame(dialog, padding="10")
         frame.pack(fill=tk.BOTH, expand=True)
         
-        ttk.Label(frame, text="IP Address:").grid(row=0, column=0, padx=5, pady=5, sticky='e')
-        ip_entry = ttk.Entry(frame, width=30)
-        ip_entry.grid(row=0, column=1, padx=5, pady=5)
-        ip_entry.insert(0, "127.0.0.1")
-        
-        ttk.Label(frame, text="Domains:").grid(row=1, column=0, padx=5, pady=5, sticky='e')
+        ttk.Label(frame, text="Domains:").grid(row=0, column=0, padx=5, pady=5, sticky='e')
         domains_entry = ttk.Entry(frame, width=30)
-        domains_entry.grid(row=1, column=1, padx=5, pady=5)
-        ttk.Label(frame, text="(space-separated)", font=('Helvetica', 8)).grid(row=1, column=2, padx=5, pady=5)
+        domains_entry.grid(row=0, column=1, padx=5, pady=5)
+        ttk.Label(frame, text="(space-separated)", font=('Helvetica', 8)).grid(row=0, column=2, padx=5, pady=5)
+        
+        ttk.Label(frame, text="Comment:").grid(row=1, column=0, padx=5, pady=5, sticky='e')
+        comment_entry = ttk.Entry(frame, width=30)
+        comment_entry.grid(row=1, column=1, padx=5, pady=5)
+        ttk.Label(frame, text="(optional)", font=('Helvetica', 8)).grid(row=1, column=2, padx=5, pady=5)
         
         def save():
-            ip = ip_entry.get().strip()
             domains = domains_entry.get().strip().split()
-            if ip and domains:
-                self.hosts_entries.append({'ip': ip, 'domains': domains})
+            comment = comment_entry.get().strip()
+            
+            if comment and not comment.startswith('#'):
+                comment = f"# {comment}"
+                
+            if domains:
+                self.hosts_entries.append({'domains': domains, 'comment': comment})
                 if self.save_hosts_file():
                     self.refresh_list()
                     dialog.destroy()
             else:
-                messagebox.showerror("Error", "Both IP and Domain(s) are required", parent=dialog)
+                messagebox.showerror("Error", "Domain(s) are required", parent=dialog)
         
         btn_frame = ttk.Frame(frame)
         btn_frame.grid(row=2, column=0, columnspan=3, pady=20)
@@ -272,28 +306,32 @@ class HostsManager(tk.Tk):
         frame = ttk.Frame(dialog, padding="10")
         frame.pack(fill=tk.BOTH, expand=True)
         
-        ttk.Label(frame, text="IP Address:").grid(row=0, column=0, padx=5, pady=5, sticky='e')
-        ip_entry = ttk.Entry(frame, width=30)
-        ip_entry.grid(row=0, column=1, padx=5, pady=5)
-        ip_entry.insert(0, entry['ip'])
-        
-        ttk.Label(frame, text="Domains:").grid(row=1, column=0, padx=5, pady=5, sticky='e')
+        ttk.Label(frame, text="Domains:").grid(row=0, column=0, padx=5, pady=5, sticky='e')
         domains_entry = ttk.Entry(frame, width=30)
-        domains_entry.grid(row=1, column=1, padx=5, pady=5)
+        domains_entry.grid(row=0, column=1, padx=5, pady=5)
         domains_entry.insert(0, ' '.join(entry['domains']))
-        ttk.Label(frame, text="(space-separated)", font=('Helvetica', 8)).grid(row=1, column=2, padx=5, pady=5)
+        ttk.Label(frame, text="(space-separated)", font=('Helvetica', 8)).grid(row=0, column=2, padx=5, pady=5)
+        
+        ttk.Label(frame, text="Comment:").grid(row=1, column=0, padx=5, pady=5, sticky='e')
+        comment_entry = ttk.Entry(frame, width=30)
+        comment_entry.grid(row=1, column=1, padx=5, pady=5)
+        comment_entry.insert(0, entry.get('comment', '').replace('# ', ''))
         
         def save():
-            ip = ip_entry.get().strip()
             domains = domains_entry.get().strip().split()
-            if ip and domains:
-                self.hosts_entries[index]['ip'] = ip
+            comment = comment_entry.get().strip()
+            
+            if comment and not comment.startswith('#'):
+                comment = f"# {comment}"
+                
+            if domains:
                 self.hosts_entries[index]['domains'] = domains
+                self.hosts_entries[index]['comment'] = comment
                 if self.save_hosts_file():
                     self.refresh_list()
                     dialog.destroy()
             else:
-                messagebox.showerror("Error", "Both IP and Domain(s) are required", parent=dialog)
+                messagebox.showerror("Error", "Domain(s) are required", parent=dialog)
         
         btn_frame = ttk.Frame(frame)
         btn_frame.grid(row=2, column=0, columnspan=3, pady=20)
@@ -317,8 +355,8 @@ class HostsManager(tk.Tk):
         entry = self.hosts_entries[self.tree.index(selected[0])]
         if messagebox.askyesno("Confirm Delete", 
                              f"Are you sure you want to delete the following entry?\n\n" 
-                             f"IP: {entry['ip']}\n" 
-                             f"Domains: {', '.join(entry['domains'])}"):
+                             f"Domains: {', '.join(entry['domains'])}\n" 
+                             f"Comment: {entry.get('comment', '')}"):
             index = self.tree.index(selected[0])
             del self.hosts_entries[index]
             if self.save_hosts_file():
