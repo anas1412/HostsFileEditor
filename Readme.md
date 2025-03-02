@@ -17,6 +17,8 @@ A modern, user-friendly GUI application for managing Windows hosts file entries.
 
 ## Installation
 
+### Option 1: Run from Source
+
 1. Ensure you have Python 3.6 or higher installed on your system
 2. Clone this repository:
    ```bash
@@ -27,6 +29,10 @@ A modern, user-friendly GUI application for managing Windows hosts file entries.
    ```bash
    pip install -r requirements.txt
    ```
+
+### Option 2: Use Pre-built Executable
+
+If you prefer not to install Python, you can download the pre-built executable from the [Releases](https://github.com/yourusername/hostsEditor/releases) page.
 
 ## Usage
 
@@ -64,6 +70,29 @@ A modern, user-friendly GUI application for managing Windows hosts file entries.
 - Click "Delete Entry"
 - Confirm the deletion
 
+## Building the Executable
+
+To build a standalone executable:
+
+1. Ensure you have all dependencies installed:
+   ```bash
+   pip install -r requirements.txt
+   pip install pyinstaller pillow
+   ```
+
+2. Run the build script:
+   ```bash
+   python build_exe.py
+   ```
+
+3. Once completed, find the executable in the `dist` folder.
+
+The build script will:
+- Create an icon for the application if one doesn't exist
+- Package all necessary dependencies
+- Configure the executable to request admin privileges automatically
+- Create a single-file executable for easy distribution
+
 ## Technical Details
 
 - Built with Python's tkinter library for the GUI
@@ -71,6 +100,7 @@ A modern, user-friendly GUI application for managing Windows hosts file entries.
 - Preserves hosts file comments and formatting
 - Implements real-time DNS cache flushing
 - Features error handling and user feedback
+- Packaged as a standalone executable using PyInstaller
 
 ## Contributing
 
